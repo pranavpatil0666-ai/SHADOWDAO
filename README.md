@@ -4,7 +4,8 @@
 
 ## Live Demo
 
-[PASTE LIVE URL AFTER DEPLOYING FRONTEND]
+- Live app: https://shadow-dao-eight.vercel.app
+- Repo: https://github.com/pranavpatil0666-ai/SHADOWDAO
 
 ## Contract Address
 
