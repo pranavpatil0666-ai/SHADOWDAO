@@ -112,9 +112,10 @@ export interface ConnectedSession {
 }
 
 export async function createConnectedSession(api: any): Promise<ConnectedSession> {
-  const [config, unshieldedAddress] = await Promise.all([
+  const [config, unshieldedAddress, shieldedAddresses] = await Promise.all([
     api.getConfiguration(),
     api.getUnshieldedAddress(),
+    api.getShieldedAddresses(),
   ]);
 
   setNetworkId(config.networkId);
@@ -134,12 +135,8 @@ export async function createConnectedSession(api: any): Promise<ConnectedSession
   };
 
   const walletProvider: WalletProvider = {
-    getCoinPublicKey: () => {
-      throw new Error('ShadowDAO vote circuit does not require a coin public key.');
-    },
-    getEncryptionPublicKey: () => {
-      throw new Error('ShadowDAO vote circuit does not require an encryption public key.');
-    },
+    getCoinPublicKey: () => shieldedAddresses.shieldedCoinPublicKey,
+    getEncryptionPublicKey: () => shieldedAddresses.shieldedEncryptionPublicKey,
     balanceTx: async (tx: any) => {
       const txHex = toHex(tx.serialize());
       const balanced = await api.balanceUnsealedTransaction(txHex);
