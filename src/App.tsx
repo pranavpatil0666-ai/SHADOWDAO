@@ -1,42 +1,34 @@
-import { useMidnight, TARGET_NETWORK } from './hooks/useMidnight';
-import WalletConnect from './components/WalletConnect';
-import CircuitCall from './components/CircuitCall';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { WalletProvider } from './context/WalletContext';
 import './index.css';
 
-const contractAddress = (import.meta.env.VITE_CONTRACT_ADDRESS as string | undefined)?.trim() || '';
+import LandingPage from './pages/LandingPage';
+import ConnectWallet from './pages/ConnectWallet';
+import DAODashboard from './pages/DAODashboard';
+import Proposals from './pages/Proposals';
+import ProposalDetails from './pages/ProposalDetails';
+import PrivateVoting from './pages/PrivateVoting';
+import Treasury from './pages/Treasury';
+import MyMembership from './pages/MyMembership';
 
 function App() {
-  const { session, address, walletType, walletStatus, availableWallets, error, isConnecting, connect, disconnect } = useMidnight();
-
   return (
-    <div className="min-h-screen bg-background text-white font-sans flex flex-col items-center py-20 px-4">
-      <div className="text-center mb-12">
-        <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary mb-4">
-          ShadowDAO Preview
-        </h1>
-        <p className="text-gray-400 max-w-lg mx-auto">
-          Midnight Builder Challenge Level 2 Demo. Vote privately with a locally generated Zero-Knowledge proof.
-        </p>
-      </div>
-
-      <WalletConnect
-        address={address}
-        walletType={walletType}
-        walletStatus={walletStatus}
-        availableWallets={availableWallets}
-        error={error}
-        isConnecting={isConnecting}
-        onConnect={connect}
-        onDisconnect={disconnect}
-      />
-
-      <CircuitCall session={session} contractAddress={contractAddress} />
-
-      <div className="mt-12 text-sm text-gray-500">
-        <p className="font-mono break-all">Contract Address: {contractAddress || 'Not set — add VITE_CONTRACT_ADDRESS'}</p>
-        <p>Network: Midnight {TARGET_NETWORK}</p>
-      </div>
-    </div>
+    <WalletProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/connect" element={<ConnectWallet />} />
+          <Route path="/dashboard" element={<DAODashboard />} />
+          <Route path="/proposals" element={<Proposals />} />
+          <Route path="/proposals/:id" element={<ProposalDetails />} />
+          <Route path="/vote/:id" element={<PrivateVoting />} />
+          <Route path="/treasury" element={<Treasury />} />
+          <Route path="/membership" element={<MyMembership />} />
+          <Route path="/governance" element={<Navigate to="/proposals" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </WalletProvider>
   );
 }
 
