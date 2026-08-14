@@ -1,0 +1,8 @@
+{
+  "version": 3,
+  "file": "index.js",
+  "sourceRoot": "../../",
+  "sources": ["contracts/shadow_dao.compact", "compiler/standard-library.compact"],
+  "names": [],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;EAOA;;;;;;;;;;MAWA,AAAA,eAGC;;;;;cAH8B,aAAqB;;;;;;;;;;;;;;;;;;yCAArB,aAAqB;;;;;;;;;iDAArB,aAAqB;;;OAGnD;MAED,AAAA,IAmBC;;;;;cAlBC,aAAqB;cACrB,QAAgB;cAChB,eAAwB;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;yCAFxB,aAAqB,+BACrB,QAAgB,+BAChB,eAAwB;;;;;;;;;sCAFxB,aAAqB;sCACrB,QAAgB;sCAChB,eAAwB;;;OAgBzB;;;;;;;;;;GACA;EApCD;;;;;;;;;;;;;;;;;;;;;;;;;;;IAGA;;;;;;;;;yEAAoC;;;;;;;GAiCnC;EC3CD,AAAA,kBAAA;oEAAA;;;EDkBA,AAAA,kBAGC,4BAH8B,aAAqB;IACvC,aAAW;UACpB,KAAW;IAAX;;;;;;;2HAAA,KAAW;;yEAAA;;GACd;EAED,AAAA,OAmBC,4BAlBC,aAAqB,EACrB,QAAgB,EAChB,eAAwB;IAEb,aAAW;UAIpB,KAAW;;;;;6CAAI;;;;;;;;;;;kHAAW;;;IAA1B;;;;;;;2HAAA,KAAW;;yEAAA;4CAMC,aAAW;gDACP,QAAM;iDACL,eAAa;GAEjC;;;;;;;;;;;;;;;;IAhCD;qCAAA;;;;;;;;;;;0GAAoC;KAAA;;;;;;;;;;"
+}

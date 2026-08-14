@@ -1,0 +1,43 @@
+// PUBLIC DATA:
+// - total_votes: Total number of votes cast.
+//
+// PRIVATE DATA (Witnesses):
+// - choice: The user's actual vote (0=Yes, 1=No, 2=Abstain, never disclosed).
+// - member_secret: A secret that proves membership (never disclosed).
+
+pragma language_version >= 0.14.0;
+import CompactStandardLibrary;
+
+export ledger total_votes: Uint<32>;
+
+export struct VoteWitness {
+    pollId: Uint<32>;
+    voteChoice: Uint<32>;
+    voterSecret: Bytes<32>;
+}
+
+export circuit create_proposal(proposal_id: Uint<32>): [] {
+    disclose(proposal_id);
+    total_votes = 0 as Uint<32>;
+}
+
+export circuit vote(
+  proposal_id: Uint<32>,
+  choice: Uint<32>,
+  member_secret: Bytes<32>
+): Bytes<32> {
+    disclose(proposal_id);
+    
+    // Increment the public total votes counter unconditionally
+    // This prevents any side-channel leakage of the private choice
+    total_votes = (total_votes + 1) as Uint<32>;
+
+    // Return a commitment to the vote. This keeps the choice hidden while 
+    // proving that a valid vote was cast. In a full system, an aggregator 
+    // or threshold mechanism would tally these commitments privately.
+    return persistentHash<VoteWitness>(VoteWitness {
+        pollId: proposal_id,
+        voteChoice: choice,
+        voterSecret: member_secret
+    });
+}

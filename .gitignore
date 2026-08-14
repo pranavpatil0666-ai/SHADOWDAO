@@ -1,0 +1,9 @@
+node_modules
+.midnight-state.json
+.midnight-wallet-state/
+dist
+.env
+.env.local
+.env.*.local
+.DS_Store
+.Rhistory
