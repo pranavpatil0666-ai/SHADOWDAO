@@ -6,7 +6,7 @@ import './index.css';
 const contractAddress = (import.meta.env.VITE_CONTRACT_ADDRESS as string | undefined)?.trim() || '';
 
 function App() {
-  const { session, address, walletName, error, isConnecting, connect, disconnect } = useMidnight();
+  const { session, address, walletType, walletStatus, availableWallets, error, isConnecting, connect, disconnect } = useMidnight();
 
   return (
     <div className="min-h-screen bg-background text-white font-sans flex flex-col items-center py-20 px-4">
@@ -21,7 +21,9 @@ function App() {
 
       <WalletConnect
         address={address}
-        walletName={walletName}
+        walletType={walletType}
+        walletStatus={walletStatus}
+        availableWallets={availableWallets}
         error={error}
         isConnecting={isConnecting}
         onConnect={connect}

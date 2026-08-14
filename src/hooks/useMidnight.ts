@@ -1,8 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { ConnectedAPI, InitialAPI } from '@midnight-ntwrk/dapp-connector-api';
 import { createConnectedSession, type ConnectedSession } from '../lib/midnight';
 
 export const TARGET_NETWORK = 'preview';
+
+export type WalletType = '1am' | 'lace' | null;
+export type WalletStatus = 'checking' | 'detected' | 'not-found';
 
 export type WalletErrorKind =
   | 'no-wallet'
@@ -21,33 +24,56 @@ export function listWallets(): InitialAPI[] {
   return Object.values((window as any).midnight as Record<string, InitialAPI>);
 }
 
-export function pickWallet(): InitialAPI | null {
-  const wallets = listWallets();
-  if (wallets.length === 0) return null;
-  return (
-    wallets.find((w) => w.name.toLowerCase().includes('lace')) ??
-    wallets.find((w) => w.name.toLowerCase().includes('1am')) ??
-    wallets[0]
-  );
+export function detectWallets(): { '1am'?: InitialAPI; lace?: InitialAPI } {
+  if (typeof window === 'undefined' || !(window as any).midnight) return {};
+  const m = (window as any).midnight as Record<string, InitialAPI>;
+  return {
+    '1am': m['1am'],
+    lace: m.mnLace,
+  };
 }
 
 export function useMidnight() {
   const [api, setApi] = useState<ConnectedAPI | null>(null);
   const [session, setSession] = useState<ConnectedSession | null>(null);
   const [address, setAddress] = useState<string | null>(null);
-  const [walletName, setWalletName] = useState<string | null>(null);
+  const [walletType, setWalletType] = useState<WalletType>(null);
   const [error, setError] = useState<WalletError | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [walletStatus, setWalletStatus] = useState<'checking' | 'detected' | 'not-found'>('checking');
+  const [availableWallets, setAvailableWallets] = useState<{ '1am'?: InitialAPI; lace?: InitialAPI }>({});
 
-  const connect = useCallback(async () => {
+  useEffect(() => {
+    const startedAt = Date.now();
+    const id = setInterval(() => {
+      const wallets = detectWallets();
+      if (wallets['1am'] || wallets.lace) {
+        setAvailableWallets(wallets);
+        setWalletType(wallets['1am'] ? '1am' : 'lace');
+        setWalletStatus('detected');
+        clearInterval(id);
+        return;
+      }
+      if (Date.now() - startedAt >= 6000) {
+        setWalletStatus('not-found');
+        clearInterval(id);
+      }
+    }, 300);
+    return () => clearInterval(id);
+  }, []);
+
+  const connect = useCallback(async (forceType?: WalletType) => {
     if (isConnecting) return;
     setIsConnecting(true);
     setError(null);
 
     try {
-      const wallet = pickWallet();
+      const wallets = availableWallets;
+      const chosenType = forceType ?? walletType;
+      const wallet = chosenType ? wallets[chosenType] : (wallets['1am'] ?? wallets.lace);
+
       if (!wallet) {
-        throw { kind: 'no-wallet' as const, message: 'No Midnight wallet found. Please install the Lace wallet extension and refresh.' };
+        throw { kind: 'no-wallet' as const, message: 'No Midnight wallet found. Please install the 1AM or Lace wallet extension and refresh.' };
       }
 
       let connectedApi: ConnectedAPI;
@@ -78,7 +104,7 @@ export function useMidnight() {
       setApi(connectedApi);
       setSession(connectedSession);
       setAddress(connectedSession.unshieldedAddress);
-      setWalletName(wallet.name);
+      setWalletType(wallet.name.toLowerCase().includes('1am') ? '1am' : 'lace');
     } catch (e: any) {
       const err: WalletError = e?.kind
         ? e
@@ -88,15 +114,17 @@ export function useMidnight() {
     } finally {
       setIsConnecting(false);
     }
-  }, [isConnecting]);
+  }, [isConnecting, walletType, availableWallets]);
 
   const disconnect = useCallback(() => {
     setApi(null);
     setSession(null);
     setAddress(null);
-    setWalletName(null);
+    setWalletType(null);
     setError(null);
+    setWalletStatus('checking');
+    setAvailableWallets({});
   }, []);
 
-  return { api, session, address, walletName, error, isConnecting, connect, disconnect };
+  return { api, session, address, walletType, walletStatus, availableWallets, error, isConnecting, connect, disconnect };
 }
