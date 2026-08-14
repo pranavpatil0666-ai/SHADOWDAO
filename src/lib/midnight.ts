@@ -139,7 +139,9 @@ export async function createConnectedSession(api: any): Promise<ConnectedSession
     getEncryptionPublicKey: () => shieldedAddresses.shieldedEncryptionPublicKey,
     balanceTx: async (tx: any) => {
       const txHex = toHex(tx.serialize());
+      console.log('[walletProvider] Balancing tx, hex length:', txHex.length);
       const balanced = await api.balanceUnsealedTransaction(txHex);
+      console.log('[walletProvider] Balanced result:', balanced);
       if (!balanced?.tx) throw new Error('balanceUnsealedTransaction returned invalid result.');
       const { Transaction } = await import('@midnight-ntwrk/midnight-js-protocol/ledger');
       return Transaction.deserialize('signature', 'proof', 'binding', fromHex(balanced.tx));
@@ -149,7 +151,13 @@ export async function createConnectedSession(api: any): Promise<ConnectedSession
   const midnightProvider: MidnightProvider = {
     submitTx: async (tx: any) => {
       const txHex = toHex(tx.serialize());
-      await api.submitTransaction(txHex);
+      console.log('[midnightProvider] Submitting tx, hex length:', txHex.length);
+      const result = await api.submitTransaction(txHex);
+      console.log('[midnightProvider] Submit result:', result);
+      // Accept string txId, or object with transactionId/id, or fall back to hex prefix
+      if (typeof result === 'string' && result) return result;
+      if (result?.transactionId) return result.transactionId;
+      if (result?.id) return result.id;
       return txHex.slice(0, 64);
     },
   };
