@@ -61,6 +61,7 @@ npm run dev
 ```
 npm test
 ```
+![Test Results Screenshot](./test-results.png)
 
 ## CI/CD
 - **Testing & Build Validation**: A GitHub Actions workflow automatically runs on every push and pull request to the `main` branch. It ensures that `npm test` and `npm run build` pass before any code is considered stable.
