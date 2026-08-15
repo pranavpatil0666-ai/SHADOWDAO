@@ -1,8 +1,10 @@
-// ShadowDAO Network Configuration
+// ShadowDAO Network Configuration for Midnight Preview
 export const getNetworkConfig = () => {
-    return {
-        nodeUrl: 'http://localhost:9944',
-        indexerUrl: 'http://localhost:8088',
-        proofServerUrl: 'http://localhost:6300'
-    };
+  return {
+    networkId: 'preview',
+    indexerUrl: 'https://indexer.preview.midnight.network/api/v4/graphql',
+    indexerWsUrl: 'wss://indexer.preview.midnight.network/api/v4/graphql/ws',
+    nodeUrl: 'https://rpc.preview.midnight.network',
+    proofServerUrl: 'http://127.0.0.1:6300'
+  };
 };
