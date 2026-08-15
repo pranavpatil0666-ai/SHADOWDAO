@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 import { connectAndBuildSession, type ConnectedSession } from '../midnight-utils';
 
-export const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS as string;
+export const CONTRACT_ADDRESS = '7145c6c7fe1b3bab9f25f5e6733f707f52f6d0edfca58add696f4301170b0f5d';
 
 interface WalletContextType {
   api: any;
