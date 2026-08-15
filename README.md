@@ -3,7 +3,8 @@
 > Private governance on Midnight — vote with a Zero-Knowledge proof, never reveal your choice.
 
 ## Live Demo
-https://shadow-dao-eight.vercel.app
+- **App:** https://shadow-dao-eight.vercel.app
+- **Demo Video:** https://www.loom.com/share/0f00372d616e4dc3b0f5a869d62ef42e
 
 ## Contract Address
 | Network  | Address                          |
