@@ -1,16 +1,22 @@
 import type * as __compactRuntime from '@midnight-ntwrk/compact-runtime';
 
-export type VoteWitness = { pollId: bigint;
-                            voteChoice: bigint;
-                            voterSecret: Uint8Array
-                          };
+export type Proposal = { title: string;
+                         description: string;
+                         yes: bigint;
+                         no: bigint;
+                         abstain: bigint
+                       };
+
+export type VoteNullifier = { proposalId: bigint; voterSecret: Uint8Array };
 
 export type Witnesses<PS> = {
 }
 
 export type ImpureCircuits<PS> = {
   create_proposal(context: __compactRuntime.CircuitContext<PS>,
-                  proposal_id_0: bigint): __compactRuntime.CircuitResults<PS, []>;
+                  proposal_id_0: bigint,
+                  title_0: string,
+                  description_0: string): __compactRuntime.CircuitResults<PS, []>;
   vote(context: __compactRuntime.CircuitContext<PS>,
        proposal_id_0: bigint,
        choice_0: bigint,
@@ -19,7 +25,9 @@ export type ImpureCircuits<PS> = {
 
 export type ProvableCircuits<PS> = {
   create_proposal(context: __compactRuntime.CircuitContext<PS>,
-                  proposal_id_0: bigint): __compactRuntime.CircuitResults<PS, []>;
+                  proposal_id_0: bigint,
+                  title_0: string,
+                  description_0: string): __compactRuntime.CircuitResults<PS, []>;
   vote(context: __compactRuntime.CircuitContext<PS>,
        proposal_id_0: bigint,
        choice_0: bigint,
@@ -31,7 +39,9 @@ export type PureCircuits = {
 
 export type Circuits<PS> = {
   create_proposal(context: __compactRuntime.CircuitContext<PS>,
-                  proposal_id_0: bigint): __compactRuntime.CircuitResults<PS, []>;
+                  proposal_id_0: bigint,
+                  title_0: string,
+                  description_0: string): __compactRuntime.CircuitResults<PS, []>;
   vote(context: __compactRuntime.CircuitContext<PS>,
        proposal_id_0: bigint,
        choice_0: bigint,
@@ -39,7 +49,19 @@ export type Circuits<PS> = {
 }
 
 export type Ledger = {
-  readonly total_votes: bigint;
+  proposals: {
+    isEmpty(): boolean;
+    size(): bigint;
+    member(key_0: bigint): boolean;
+    lookup(key_0: bigint): Proposal;
+    [Symbol.iterator](): Iterator<[bigint, Proposal]>
+  };
+  nullifiers: {
+    isEmpty(): boolean;
+    size(): bigint;
+    member(elem_0: Uint8Array): boolean;
+    [Symbol.iterator](): Iterator<Uint8Array>
+  };
 }
 
 export type ContractReferenceLocations = any;

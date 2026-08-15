@@ -9,11 +9,18 @@ export function useMidnight() {
   const connect = useCallback(async () => {
     try {
       setError(null);
-      if (typeof window === 'undefined' || !(window as any).midnight?.mnLace) {
-        throw new Error('Wallet not installed. Please install the Lace browser extension.');
+      const midnight = (window as any).midnight;
+      if (!midnight) {
+        throw new Error('No Midnight wallet detected. Please install Lace or 1am Wallet.');
       }
       
-      const laceApi = await (window as any).midnight.mnLace.enable();
+      const walletProvider = midnight['1am'] || midnight.mn1am || midnight.mnLace;
+      
+      if (!walletProvider) {
+        throw new Error('Supported Midnight wallet not found. Please install Lace or 1am Wallet.');
+      }
+      
+      const laceApi = await walletProvider.enable();
       const state = await laceApi.state();
       
       if (!state.address) {

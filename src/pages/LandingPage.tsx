@@ -49,7 +49,7 @@ export default function LandingPage() {
               to="/connect"
               className="btn-primary text-lg px-10 py-4 w-full sm:w-auto"
             >
-              Connect Lace Wallet
+              Connect Wallet
             </Link>
             <Link
               to="/proposals"

@@ -8,7 +8,7 @@ interface WalletConnectProps {
 export default function WalletConnect({ address, error, onConnect, onDisconnect }: WalletConnectProps) {
   return (
     <div className="p-6 bg-surface/80 backdrop-blur-md rounded-2xl border border-white/10 mb-8 max-w-xl w-full">
-      <h2 className="text-xl font-bold mb-4">Lace Wallet Connection</h2>
+      <h2 className="text-xl font-bold mb-4">Midnight Wallet Connection</h2>
       
       {error && (
         <div className="p-3 mb-4 bg-red-500/20 border border-red-500/50 text-red-400 rounded-lg text-sm">

@@ -10,6 +10,7 @@ import ProposalDetails from './pages/ProposalDetails';
 import PrivateVoting from './pages/PrivateVoting';
 import Treasury from './pages/Treasury';
 import MyMembership from './pages/MyMembership';
+import CreateProposal from './pages/CreateProposal';
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
           <Route path="/proposals" element={<Proposals />} />
           <Route path="/proposals/:id" element={<ProposalDetails />} />
           <Route path="/vote/:id" element={<PrivateVoting />} />
+          <Route path="/create-proposal" element={<CreateProposal />} />
           <Route path="/treasury" element={<Treasury />} />
           <Route path="/membership" element={<MyMembership />} />
           <Route path="/governance" element={<Navigate to="/proposals" replace />} />

@@ -1,43 +1,81 @@
 // PUBLIC DATA:
-// - total_votes: Total number of votes cast.
+// - proposals: Map of proposal_id -> { title, description, yes, no, abstain }.
+//   The tally (yes/no/abstain) is PUBLIC so results are readable on-chain.
+// - nullifiers: Set of used vote nullifiers, prevents double voting.
 //
-// PRIVATE DATA (Witnesses):
-// - choice: The user's actual vote (0=Yes, 1=No, 2=Abstain, never disclosed).
-// - member_secret: A secret that proves membership (never disclosed).
+// PRIVATE DATA (Witness):
+// - member_secret: a secret known only to the voter. It never appears on-chain;
+//   only a nullifier derived from it is stored, so the voter stays anonymous
+//   while the choice they cast is disclosed to update the public tally.
 
 pragma language_version >= 0.14.0;
 import CompactStandardLibrary;
 
-export ledger total_votes: Uint<32>;
+export struct Proposal {
+    title: Opaque<"string">;
+    description: Opaque<"string">;
+    yes: Uint<32>;
+    no: Uint<32>;
+    abstain: Uint<32>;
+}
 
-export struct VoteWitness {
-    pollId: Uint<32>;
-    voteChoice: Uint<32>;
+export struct VoteNullifier {
+    proposalId: Uint<32>;
     voterSecret: Bytes<32>;
 }
 
-export circuit create_proposal(proposal_id: Uint<32>): [] {
-    disclose(proposal_id);
-    total_votes = 0 as Uint<32>;
+export ledger proposals: Map<Uint<32>, Proposal>;
+export ledger nullifiers: Set<Bytes<32>>;
+
+export circuit create_proposal(
+  proposal_id: Uint<32>,
+  title: Opaque<"string">,
+  description: Opaque<"string">,
+): [] {
+    const pubId = disclose(proposal_id);
+    const pubTitle = disclose(title);
+    const pubDesc = disclose(description);
+    assert(!proposals.member(pubId), "proposal already exists");
+    proposals.insert(pubId, Proposal {
+        title: pubTitle,
+        description: pubDesc,
+        yes: 0 as Uint<32>,
+        no: 0 as Uint<32>,
+        abstain: 0 as Uint<32>,
+    });
 }
 
 export circuit vote(
   proposal_id: Uint<32>,
   choice: Uint<32>,
-  member_secret: Bytes<32>
+  member_secret: Bytes<32>,
 ): Bytes<32> {
-    disclose(proposal_id);
-    
-    // Increment the public total votes counter unconditionally
-    // This prevents any side-channel leakage of the private choice
-    total_votes = (total_votes + 1) as Uint<32>;
+    const pubId = disclose(proposal_id);
+    const pubChoice = disclose(choice);
 
-    // Return a commitment to the vote. This keeps the choice hidden while 
-    // proving that a valid vote was cast. In a full system, an aggregator 
-    // or threshold mechanism would tally these commitments privately.
-    return persistentHash<VoteWitness>(VoteWitness {
-        pollId: proposal_id,
-        voteChoice: choice,
-        voterSecret: member_secret
+    assert(pubChoice == 0 as Uint<32> || pubChoice == 1 as Uint<32> || pubChoice == 2 as Uint<32>, "invalid choice");
+    assert(proposals.member(pubId), "proposal does not exist");
+
+    const nul = persistentHash<VoteNullifier>(VoteNullifier {
+        proposalId: pubId,
+        voterSecret: member_secret,
     });
+    const pubNul = disclose(nul);
+
+    assert(!nullifiers.member(pubNul), "already voted on this proposal");
+    nullifiers.insert(pubNul);
+
+    const p = proposals.lookup(pubId);
+    const isYes = disclose(pubChoice == 0 as Uint<32>);
+    const isNo = disclose(pubChoice == 1 as Uint<32>);
+    const isAbstain = disclose(pubChoice == 2 as Uint<32>);
+    proposals.insert(pubId, Proposal {
+        title: p.title,
+        description: p.description,
+        yes: isYes ? (p.yes + 1) as Uint<32> : p.yes,
+        no: isNo ? (p.no + 1) as Uint<32> : p.no,
+        abstain: isAbstain ? (p.abstain + 1) as Uint<32> : p.abstain,
+    });
+
+    return nul;
 }

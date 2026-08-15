@@ -14,6 +14,20 @@
             "type-name": "Uint",
             "maxval": 4294967295
           }
+        },
+        {
+          "name": "title",
+          "type": {
+            "type-name": "Opaque",
+            "tsType": "string"
+          }
+        },
+        {
+          "name": "description",
+          "type": {
+            "type-name": "Opaque",
+            "tsType": "string"
+          }
         }
       ],
       "result-type": {
@@ -61,13 +75,64 @@
   ],
   "ledger": [
     {
-      "name": "total_votes",
+      "name": "proposals",
       "index": 0,
       "exported": true,
-      "storage": "Cell",
-      "type": {
+      "storage": "Map",
+      "key": {
         "type-name": "Uint",
         "maxval": 4294967295
+      },
+      "value": {
+        "type-name": "Struct",
+        "name": "Proposal",
+        "elements": [
+          {
+            "name": "title",
+            "type": {
+              "type-name": "Opaque",
+              "tsType": "string"
+            }
+          },
+          {
+            "name": "description",
+            "type": {
+              "type-name": "Opaque",
+              "tsType": "string"
+            }
+          },
+          {
+            "name": "yes",
+            "type": {
+              "type-name": "Uint",
+              "maxval": 4294967295
+            }
+          },
+          {
+            "name": "no",
+            "type": {
+              "type-name": "Uint",
+              "maxval": 4294967295
+            }
+          },
+          {
+            "name": "abstain",
+            "type": {
+              "type-name": "Uint",
+              "maxval": 4294967295
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "nullifiers",
+      "index": 1,
+      "exported": true,
+      "storage": "Set",
+      "type": {
+        "type-name": "Bytes",
+        "length": 32
       }
     }
   ]

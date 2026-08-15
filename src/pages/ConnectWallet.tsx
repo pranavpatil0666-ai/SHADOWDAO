@@ -2,12 +2,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useWallet } from '../context/WalletContext';
 
 export default function ConnectWallet() {
-  const { api, address, error, isConnecting, connect, disconnect, clearError } = useWallet();
+  const { address, error, isConnecting, connect, disconnect, clearError } = useWallet();
   const navigate = useNavigate();
 
   const handleConnect = async () => {
-    await connect();
-    if (api && address) {
+    const ok = await connect();
+    if (ok) {
       navigate('/dashboard');
     }
   };
@@ -23,7 +23,7 @@ export default function ConnectWallet() {
           </Link>
           <h2 className="text-3xl font-bold mb-4">Connect Your Wallet</h2>
           <p className="text-gray-400">
-            Connect your Lace wallet to participate in private governance on Midnight Network.
+            Connect your Midnight wallet to participate in private governance on Midnight Network.
           </p>
         </div>
 
@@ -70,7 +70,7 @@ export default function ConnectWallet() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                 </svg>
               </div>
-              <p className="text-gray-400 mb-8">Lace Wallet not connected</p>
+              <p className="text-gray-400 mb-8">Midnight Wallet not connected</p>
               <button
                 onClick={handleConnect}
                 disabled={isConnecting}
@@ -85,11 +85,11 @@ export default function ConnectWallet() {
                     Connecting...
                   </span>
                 ) : (
-                  'Connect Lace Wallet'
+                  'Connect Wallet'
                 )}
               </button>
               <p className="text-xs text-gray-500 mt-4 text-center">
-                Requires the <a href="https://lace.io/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Lace browser extension</a> with Midnight Network support.
+                Requires the <a href="https://lace.io/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Lace</a> or <a href="https://1am.midnight.network/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">1AM Wallet</a> browser extension with Midnight Network support.
               </p>
             </div>
           )}
@@ -97,10 +97,10 @@ export default function ConnectWallet() {
           <div className="mt-8 p-4 bg-[#0B0F19]/50 rounded-xl border border-white/5">
             <h4 className="text-sm font-medium text-gray-300 mb-3">How it works:</h4>
             <ol className="space-y-2 text-sm text-gray-400 text-left">
-              <li className="flex items-start gap-2"><span className="text-primary font-bold">1.</span> Install Lace wallet extension</li>
+              <li className="flex items-start gap-2"><span className="text-primary font-bold">1.</span> Install Lace or 1AM Wallet browser extension</li>
               <li className="flex items-start gap-2"><span className="text-primary font-bold">2.</span> Switch to Midnight Preview network</li>
               <li className="flex items-start gap-2"><span className="text-primary font-bold">3.</span> Get tNIGHT from <a href="https://midnight-tmnight-preview.nethermind.dev" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">faucet</a></li>
-              <li className="flex items-start gap-2"><span className="text-primary font-bold">4.</span> Click "Connect Lace Wallet" above</li>
+              <li className="flex items-start gap-2"><span className="text-primary font-bold">4.</span> Click "Connect Wallet" above</li>
             </ol>
           </div>
         </div>

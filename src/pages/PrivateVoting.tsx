@@ -1,27 +1,7 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { useWallet } from '../context/WalletContext';
-
-const mockProposals: Record<number, { id: number; title: string; description: string; endsAt: string }> = {
-  1: {
-    id: 1,
-    title: 'Allocate 1,000 NIGHT to Developer Grant #04',
-    description: 'This proposal allocates 1,000 NIGHT tokens from the ShadowDAO Treasury to fund the ongoing development of ZK primitives by Developer Grant #04.',
-    endsAt: '2024-02-15',
-  },
-  2: {
-    id: 2,
-    title: 'Upgrade Governance Contract to v2',
-    description: 'Upgrade the ShadowDAO governance contract to version 2 with improved vote delegation and quadratic voting support.',
-    endsAt: '2024-01-01',
-  },
-  3: {
-    id: 3,
-    title: 'Treasury Diversification Strategy',
-    description: 'Diversify 20% of treasury holdings into stablecoins to reduce volatility risk.',
-    endsAt: '2024-03-01',
-  },
-};
+import { getProposals, submitVote, type ProposalLedger } from '../midnight-utils';
 
 const VOTE_CHOICES = [
   { id: 0, label: 'YES', desc: 'Approve the proposal', color: 'green' },
@@ -43,16 +23,65 @@ const SELECTED_CLASSES = {
 
 export default function PrivateVoting() {
   const { id } = useParams<{ id: string }>();
-  const proposal = mockProposals[Number(id)];
-  const { api, address } = useWallet();
+  const proposalId = BigInt(id || '0');
+  const { session, contractAddress } = useWallet();
   const navigate = useNavigate();
 
+  const [proposal, setProposal] = useState<ProposalLedger | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedVote, setSelectedVote] = useState<number | null>(null);
   const [isProving, setIsProving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [proofStatus, setProofStatus] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      if (!session) {
+        setIsLoading(false);
+        return;
+      }
+      setIsLoading(true);
+      try {
+        const proposals = await getProposals(session, contractAddress);
+        if (cancelled) return;
+        setProposal(proposals.find((p) => p.id === proposalId) ?? null);
+      } catch (e: any) {
+        console.error(e);
+        if (!cancelled) setError(e.message);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [session, contractAddress, proposalId]);
+
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-[#0B0F19] text-white flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold mb-4">Connect Your Wallet</h1>
+          <p className="text-gray-400 mb-6">You need to connect your wallet to cast a private vote.</p>
+          <Link to="/connect" className="btn-primary">Connect Wallet</Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#0B0F19] text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <h1 className="text-4xl font-bold mb-4">Loading Proposal</h1>
+          <p className="text-gray-400">Fetching on-chain state...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!proposal) {
     return (
@@ -67,7 +96,7 @@ export default function PrivateVoting() {
 
   const handleVote = async () => {
     if (selectedVote === null) return;
-    if (!api || !address) {
+    if (!session) {
       setError('Please connect your wallet first.');
       return;
     }
@@ -78,42 +107,28 @@ export default function PrivateVoting() {
     setProofStatus('Generating ZK Proof locally...');
 
     try {
-      // Simulate proof generation
-      await new Promise(r => setTimeout(r, 2000));
-      
-      setIsProving(false);
-      setIsSubmitting(true);
-      setProofStatus('Please sign in Lace wallet...');
+      const txId = await submitVote(session, contractAddress, proposal.id, selectedVote);
 
-      // Get unshielded address and submit a dummy transaction to trigger Lace signing
-      const { unshieldedAddress } = await api.getUnshieldedAddress();
-      
-      const { tx: transaction } = await api.makeTransfer([{
-        kind: 'unshielded',
-        type: '0x0000000000000000000000000000000000000000000000000000000000000000',
-        value: 1000n,
-        recipient: unshieldedAddress
-      }]);
-
-      await api.submitTransaction(transaction);
-      
-      setResult(`✅ Vote transaction confirmed on Preview Network!`);
-      setSelectedVote(null);
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || 'Transaction failed or was rejected by wallet.');
-    } finally {
       setIsProving(false);
       setIsSubmitting(false);
+      setResult(`Vote submitted on-chain! Tx: ${txId.slice(0, 20)}...`);
+      setSelectedVote(null);
+      setProofStatus('');
+    } catch (err: any) {
+      console.error(err);
+      setIsProving(false);
+      setIsSubmitting(false);
+      setProofStatus('');
+      setError(err.message || 'Transaction failed or was rejected by wallet.');
     }
   };
 
   return (
     <div className="min-h-screen bg-[#0B0F19] text-white">
       <header className="p-6 max-w-7xl mx-auto w-full flex justify-between items-center border-b border-white/5">
-        <a href="/" className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">
+        <Link to="/" className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">
           ShadowDAO
-        </a>
+        </Link>
       </header>
 
       <main className="p-6 max-w-3xl mx-auto w-full">
@@ -126,7 +141,7 @@ export default function PrivateVoting() {
 
         <div className="glass-panel p-8">
           <div className="inline-block px-3 py-1 bg-green-500/20 text-green-400 text-xs font-semibold rounded-md border border-green-500/30 mb-4">
-            Active Proposal #{proposal.id}
+            Active Proposal #{proposal.id.toString()}
           </div>
           <h2 className="text-3xl font-bold mb-4">{proposal.title}</h2>
           <p className="text-gray-300 leading-relaxed mb-8">
@@ -135,8 +150,8 @@ export default function PrivateVoting() {
 
           <div className="mb-8 p-4 bg-[#0B0F19]/50 rounded-xl border border-white/5">
             <div className="flex items-center justify-between text-sm text-gray-400">
-              <span>Voting ends: {proposal.endsAt}</span>
-              <span>Your vote is private • ZK-SNARK secured</span>
+              <span>Your vote choice is public (tally), your identity is anonymous</span>
+              <span>ZK-SNARK secured</span>
             </div>
           </div>
 
@@ -176,35 +191,24 @@ export default function PrivateVoting() {
             ))}
           </div>
 
-          {isProving ? (
+          {isProving || isSubmitting ? (
             <div className="py-4 px-6 bg-[#25314D] border border-white/10 rounded-xl animate-pulse flex justify-center items-center">
               <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mr-3"></div>
-              <span className="text-primary font-medium">{proofStatus}</span>
-            </div>
-          ) : isSubmitting ? (
-            <div className="py-4 px-6 bg-[#25314D] border border-white/10 rounded-xl animate-pulse flex justify-center items-center">
               <span className="text-primary font-medium">{proofStatus}</span>
             </div>
           ) : (
             <button
               onClick={handleVote}
-              disabled={!api || selectedVote === null}
-              className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${selectedVote !== null && api ? 'bg-gradient-to-r from-secondary to-blue-500 text-white hover:scale-[1.01] hover:shadow-[0_0_20px_rgba(6,182,212,0.4)]' : 'bg-gray-800 text-gray-500 cursor-not-allowed'}`}
+              disabled={!session || selectedVote === null}
+              className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${selectedVote !== null && session ? 'bg-gradient-to-r from-secondary to-blue-500 text-white hover:scale-[1.01] hover:shadow-[0_0_20px_rgba(6,182,212,0.4)]' : 'bg-gray-800 text-gray-500 cursor-not-allowed'}`}
             >
-              {selectedVote !== null && api ? 'Generate Proof & Cast Vote' : !api ? 'Connect Wallet to Vote' : 'Select an option to vote'}
+              {selectedVote !== null && session ? 'Generate Proof & Cast Vote' : !session ? 'Connect Wallet to Vote' : 'Select an option to vote'}
             </button>
           )}
 
           <p className="text-xs text-gray-500 mt-4 text-center">
-            Your vote and membership secret are hashed into a Zero-Knowledge commitment locally and never leave your browser.
+            Your identity and membership secret are kept private via a ZK nullifier — only your choice contributes to the public tally.
           </p>
-
-          <div className="text-center text-xs text-gray-500 mt-4 flex items-center justify-center space-x-2">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-            <span>Your vote is secured by Midnight ZK-SNARKs</span>
-          </div>
         </div>
       </main>
     </div>
