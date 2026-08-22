@@ -25,7 +25,7 @@ export struct VoteNullifier {
 }
 
 export ledger proposals: Map<Uint<32>, Proposal>;
-export ledger nullifiers: Set<Bytes<32>>;
+export ledger nullifiers: Map<Bytes<32>, Uint<32>>;
 
 export circuit create_proposal(
   proposal_id: Uint<32>,
@@ -63,7 +63,7 @@ export circuit vote(
     const pubNul = disclose(nul);
 
     assert(!nullifiers.member(pubNul), "already voted on this proposal");
-    nullifiers.insert(pubNul);
+    nullifiers.insert(pubNul, 1 as Uint<32>);
 
     const p = proposals.lookup(pubId);
     const isYes = disclose(pubChoice == 0 as Uint<32>);

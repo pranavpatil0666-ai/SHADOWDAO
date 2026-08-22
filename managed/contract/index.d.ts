@@ -59,8 +59,9 @@ export type Ledger = {
   nullifiers: {
     isEmpty(): boolean;
     size(): bigint;
-    member(elem_0: Uint8Array): boolean;
-    [Symbol.iterator](): Iterator<Uint8Array>
+    member(key_0: Uint8Array): boolean;
+    lookup(key_0: Uint8Array): bigint;
+    [Symbol.iterator](): Iterator<[Uint8Array, bigint]>
   };
 }
 
