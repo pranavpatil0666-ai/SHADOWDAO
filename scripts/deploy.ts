@@ -22,7 +22,7 @@ import * as Rx from 'rxjs';
 
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { CompiledContract } from '@midnight-ntwrk/compact-js';
-import { sampleSigningKey } from '@midnight-ntwrk/compact-runtime';
+import { sampleSigningKey, signingKeyFromBip340 } from '@midnight-ntwrk/compact-runtime';
 import { createUnprovenDeployTx, submitTxAsync } from '@midnight-ntwrk/midnight-js-contracts';
 import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
 import { NodeZkConfigProvider } from '@midnight-ntwrk/midnight-js-node-zk-config-provider';
@@ -270,17 +270,32 @@ async function main() {
       compiledContract: compiledContract as any,
       args: [],
       initialPrivateState: {},
-      signingKey: sampleSigningKey(),
+      signingKey: signingKeyFromBip340(Buffer.from(seed, 'hex')),
     },
   );
 
   const contractAddress = deployTxData.public.contractAddress;
   console.log(`   Contract address: ${contractAddress}`);
 
-  await submitTxAsync(providers as any, { unprovenTx: deployTxData.private.unprovenTx });
+  const checkRes = await fetch(NETWORK_CONFIG.indexer, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      query: `query($address: HexEncoded!) { contractAction(address: $address) { state } }`,
+      variables: { address: contractAddress },
+    }),
+  });
+  const checkPayload: any = await checkRes.json();
+  const alreadyDeployed = !!checkPayload?.data?.contractAction?.state;
 
-  console.log('6. Waiting for the contract to be indexed...');
-  await waitForContractDeployment(contractAddress);
+  if (alreadyDeployed) {
+    console.log('   Contract is already deployed. Skipping deployment transaction.');
+  } else {
+    await submitTxAsync(providers as any, { unprovenTx: deployTxData.private.unprovenTx });
+
+    console.log('6. Waiting for the contract to be indexed...');
+    await waitForContractDeployment(contractAddress);
+  }
 
   // --- Persist address for the frontend -------------------------------------
   const envLocalPath = path.resolve(__dirname, '..', '.env.local');
@@ -292,7 +307,7 @@ async function main() {
     .join('\n') + '\n';
   fs.writeFileSync(envLocalPath, updated);
 
-  console.log('\n✅ ShadowDAO deployed to Preview!');
+  console.log('\n✅ ShadowDAO deployment complete!');
   console.log(`   Contract Address: ${contractAddress}`);
   console.log(`   Written to .env.local (VITE_CONTRACT_ADDRESS)`);
   console.log('   Next: paste this address into README.md, then `npm run dev`.\n');
