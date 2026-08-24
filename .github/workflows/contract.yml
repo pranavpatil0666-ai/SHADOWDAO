@@ -29,8 +29,3 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-midnight-wallet-
             
-      - name: Deploy contract (Idempotent)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: npm run deploy:preview
-        env:
-          WALLET_SEED: ${{ secrets.WALLET_SEED }}
