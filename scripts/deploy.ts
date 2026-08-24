@@ -118,8 +118,8 @@ async function main() {
     CompiledContract.withCompiledFileAssets(zkConfigPath),
   );
 
-  // --- Wallet setup ---------------------------------------------------------
-  console.log('1. Creating wallet from seed...');
+  // --- Step 1: Pre-compute Contract Address Offline ---
+  console.log('1. Deriving keys and pre-computing contract address...');
   const hdWallet = HDWallet.fromSeed(Buffer.from(seed, 'hex'));
   if (hdWallet.type !== 'seedOk') throw new Error('Invalid seed');
   const keys = hdWallet.hdWallet
@@ -133,139 +133,17 @@ async function main() {
   const dustSecretKey = ledger.DustSecretKey.fromSeed(keys.keys[Roles.Dust]);
   const unshieldedKeystore = createKeystore(keys.keys[Roles.NightExternal], NETWORK);
 
-  const walletConfig = {
-    networkId: NETWORK,
-    indexerClientConnection: {
-      indexerHttpUrl: NETWORK_CONFIG.indexer,
-      indexerWsUrl: NETWORK_CONFIG.indexerWS,
-    },
-    provingServerUrl: new URL(NETWORK_CONFIG.proofServer),
-    relayURL: new URL(NETWORK_CONFIG.node.replace(/^http/, 'ws')),
-    txHistoryStorage: new NoOpTransactionHistoryStorage(),
-    costParameters: { additionalFeeOverhead: 300_000_000_000_000n, feeBlocksMargin: 5 },
-  };
-
-  const saved = loadPersistedState();
-
-  const wallet = await WalletFacade.init({
-    configuration: walletConfig,
-    shielded: async (config) => {
-      const cls = ShieldedWallet(config);
-      if (saved.shielded !== undefined) {
-        try {
-          return await (cls as any).restore(saved.shielded);
-        } catch (e) {
-          console.warn('   ⚠ Shielded restore failed, syncing fresh:', (e as Error).message);
-        }
-      }
-      return cls.startWithSecretKeys(shieldedSecretKeys);
-    },
-    unshielded: async (config) => {
-      const cls = UnshieldedWallet(config);
-      if (saved.unshielded !== undefined) {
-        try {
-          return await (cls as any).restore(saved.unshielded);
-        } catch (e) {
-          console.warn('   ⚠ Unshielded restore failed, syncing fresh:', (e as Error).message);
-        }
-      }
-      return cls.startWithPublicKey(PublicKey.fromKeyStore(unshieldedKeystore));
-    },
-    dust: async (config) => {
-      const cls = DustWallet(config);
-      if (saved.dust !== undefined) {
-        try {
-          return await (cls as any).restore(saved.dust);
-        } catch (e) {
-          console.warn('   ⚠ DUST restore failed, syncing fresh:', (e as Error).message);
-        }
-      }
-      return cls.startWithSecretKey(dustSecretKey, ledger.LedgerParameters.initialParameters().dust);
-    },
-  });
-  await wallet.start(shieldedSecretKeys, dustSecretKey);
-
-  console.log('2. Syncing with network (may take a few minutes)...');
-  const state = await Rx.firstValueFrom(
-    wallet.state().pipe(
-      Rx.throttleTime(5000),
-      Rx.filter((s) => s.isSynced),
-    ),
-  );
-
-  const address = unshieldedKeystore.getBech32Address().toString();
-  const balance = state.unshielded.balances[ledger.unshieldedToken().raw] ?? 0n;
-  console.log(`   Wallet: ${address}`);
-  console.log(`   tNIGHT balance: ${balance.toLocaleString()}`);
-
-  await persistWalletState(wallet);
-
-  if (balance === 0n) {
-    console.error('\n❌ Wallet has 0 tNIGHT. Fund it from the Preview faucet first:');
-    console.error('   https://midnight-tmnight-preview.nethermind.dev\n');
-    await wallet.stop();
-    process.exit(1);
-  }
-
-  // --- DUST registration ----------------------------------------------------
-  console.log('3. Checking DUST...');
-  const dustState = await Rx.firstValueFrom(wallet.state().pipe(Rx.filter((s) => s.isSynced)));
-  const unregistered = dustState.unshielded.availableCoins.filter(
-    (c: any) => !c.meta?.registeredForDustGeneration,
-  );
-  if (unregistered.length > 0) {
-    console.log(`   Registering ${unregistered.length} NIGHT UTXOs for DUST generation...`);
-    const recipe = await wallet.registerNightUtxosForDustGeneration(
-      unregistered,
-      unshieldedKeystore.getPublicKey(),
-      (payload) => unshieldedKeystore.signData(payload),
-    );
-    const finalized = await wallet.finalizeRecipe(recipe);
-    await wallet.submitTransaction(finalized);
-  }
-
-  if (dustState.dust.balance(new Date()) === 0n) {
-    console.log('   Waiting for DUST tokens to accrue...');
-    await Rx.firstValueFrom(
-      wallet.state().pipe(
-        Rx.throttleTime(5000),
-        Rx.filter((s) => s.isSynced),
-        Rx.filter((s) => s.dust.balance(new Date()) > 0n),
-      ),
-    );
-  }
-  console.log('   DUST ready!\n');
-
-  // --- Providers ------------------------------------------------------------
-  console.log('4. Building providers...');
-  const zkConfigProvider = new NodeZkConfigProvider(zkConfigPath);
-
-  const walletAndMidnightProvider = {
+  const lazyProvider = {
     getCoinPublicKey: () => shieldedSecretKeys.coinPublicKey,
     getEncryptionPublicKey: () => shieldedSecretKeys.encryptionPublicKey,
-    async balanceTx(tx: any, ttl?: Date) {
-      const recipe = await wallet.balanceUnboundTransaction(
-        tx,
-        { shieldedSecretKeys, dustSecretKey },
-        { ttl: ttl ?? new Date(Date.now() + 30 * 60 * 1000) },
-      );
-      return wallet.finalizeRecipe(recipe);
-    },
-    submitTx: (tx: any) => wallet.submitTransaction(tx) as any,
+    balanceTx: async () => { throw new Error('Offline mode'); },
+    submitTx: async () => { throw new Error('Offline mode'); },
   };
 
-  const providers = {
-    publicDataProvider: indexerPublicDataProvider(NETWORK_CONFIG.indexer, NETWORK_CONFIG.indexerWS),
-    zkConfigProvider,
-    proofProvider: httpClientProofProvider(NETWORK_CONFIG.proofServer, zkConfigProvider),
-    walletProvider: walletAndMidnightProvider,
-    midnightProvider: walletAndMidnightProvider,
-  };
-
-  // --- Deploy ---------------------------------------------------------------
-  console.log('5. Deploying ShadowDAO contract (generating ZK proof + submitting)...');
+  const zkConfigProvider = new NodeZkConfigProvider(zkConfigPath);
+  
   const deployTxData = await createUnprovenDeployTx(
-    { zkConfigProvider, walletProvider: walletAndMidnightProvider },
+    { zkConfigProvider, walletProvider: lazyProvider as any },
     {
       compiledContract: compiledContract as any,
       args: [],
@@ -275,8 +153,10 @@ async function main() {
   );
 
   const contractAddress = deployTxData.public.contractAddress;
-  console.log(`   Contract address: ${contractAddress}`);
+  console.log(`   Computed Contract address: ${contractAddress}`);
 
+  // --- Step 2: Check if already deployed ---
+  console.log('2. Checking if contract is already deployed on the network...');
   const checkRes = await fetch(NETWORK_CONFIG.indexer, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -285,16 +165,125 @@ async function main() {
       variables: { address: contractAddress },
     }),
   });
-  const checkPayload: any = await checkRes.json();
+  const checkPayload = await checkRes.json() as any;
   const alreadyDeployed = !!checkPayload?.data?.contractAction?.state;
 
   if (alreadyDeployed) {
-    console.log('   Contract is already deployed. Skipping deployment transaction.');
+    console.log('   ✅ Contract is already deployed. Skipping full wallet sync and deployment.');
   } else {
-    await submitTxAsync(providers as any, { unprovenTx: deployTxData.private.unprovenTx });
+    // --- Step 3: Full Wallet Sync and Deployment ---
+    console.log('   Contract not found. Proceeding with full deployment.');
+    console.log('3. Initializing and syncing wallet (may take a few minutes if not cached)...');
+    
+    const walletConfig = {
+      networkId: NETWORK,
+      indexerClientConnection: {
+        indexerHttpUrl: NETWORK_CONFIG.indexer,
+        indexerWsUrl: NETWORK_CONFIG.indexerWS,
+      },
+      provingServerUrl: new URL(NETWORK_CONFIG.proofServer),
+      relayURL: new URL(NETWORK_CONFIG.node.replace(/^http/, 'ws')),
+      txHistoryStorage: new NoOpTransactionHistoryStorage(),
+      costParameters: { additionalFeeOverhead: 300_000_000_000_000n, feeBlocksMargin: 5 },
+    };
 
+    const saved = loadPersistedState();
+
+    const wallet = await WalletFacade.init({
+      configuration: walletConfig,
+      shielded: async (config) => {
+        const cls = ShieldedWallet(config);
+        if (saved.shielded !== undefined) {
+          try { return await (cls as any).restore(saved.shielded); } catch (e) { console.warn('   ⚠ Shielded restore failed:', (e as Error).message); }
+        }
+        return cls.startWithSecretKeys(shieldedSecretKeys);
+      },
+      unshielded: async (config) => {
+        const cls = UnshieldedWallet(config);
+        if (saved.unshielded !== undefined) {
+          try { return await (cls as any).restore(saved.unshielded); } catch (e) { console.warn('   ⚠ Unshielded restore failed:', (e as Error).message); }
+        }
+        return cls.startWithPublicKey(PublicKey.fromKeyStore(unshieldedKeystore));
+      },
+      dust: async (config) => {
+        const cls = DustWallet(config);
+        if (saved.dust !== undefined) {
+          try { return await (cls as any).restore(saved.dust); } catch (e) { console.warn('   ⚠ DUST restore failed:', (e as Error).message); }
+        }
+        return cls.startWithSecretKey(dustSecretKey, ledger.LedgerParameters.initialParameters().dust);
+      },
+    });
+    
+    await wallet.start(shieldedSecretKeys, dustSecretKey);
+    const state = await Rx.firstValueFrom(wallet.state().pipe(Rx.throttleTime(5000), Rx.filter((s) => s.isSynced)));
+
+    const address = unshieldedKeystore.getBech32Address().toString();
+    const balance = state.unshielded.balances[ledger.unshieldedToken().raw] ?? 0n;
+    console.log(`   Wallet: ${address}`);
+    console.log(`   tNIGHT balance: ${balance.toLocaleString()}`);
+
+    await persistWalletState(wallet);
+
+    if (balance === 0n) {
+      console.error('\n❌ Wallet has 0 tNIGHT. Fund it from the Preview faucet first:');
+      console.error('   https://midnight-tmnight-preview.nethermind.dev\n');
+      await wallet.stop();
+      process.exit(1);
+    }
+
+    console.log('4. Checking DUST...');
+    const dustState = await Rx.firstValueFrom(wallet.state().pipe(Rx.filter((s) => s.isSynced)));
+    const unregistered = dustState.unshielded.availableCoins.filter((c: any) => !c.meta?.registeredForDustGeneration);
+    if (unregistered.length > 0) {
+      console.log(`   Registering ${unregistered.length} NIGHT UTXOs for DUST generation...`);
+      const recipe = await wallet.registerNightUtxosForDustGeneration(
+        unregistered,
+        unshieldedKeystore.getPublicKey(),
+        (payload) => unshieldedKeystore.signData(payload),
+      );
+      const finalized = await wallet.finalizeRecipe(recipe);
+      await wallet.submitTransaction(finalized);
+    }
+
+    if (dustState.dust.balance(new Date()) === 0n) {
+      console.log('   Waiting for DUST tokens to accrue...');
+      await Rx.firstValueFrom(
+        wallet.state().pipe(
+          Rx.throttleTime(5000),
+          Rx.filter((s) => s.isSynced),
+          Rx.filter((s) => s.dust.balance(new Date()) > 0n),
+        ),
+      );
+    }
+    console.log('   DUST ready!\n');
+
+    console.log('5. Building providers and submitting deployment...');
+    const walletAndMidnightProvider = {
+      getCoinPublicKey: () => shieldedSecretKeys.coinPublicKey,
+      getEncryptionPublicKey: () => shieldedSecretKeys.encryptionPublicKey,
+      async balanceTx(tx: any, ttl?: Date) {
+        const recipe = await wallet.balanceUnboundTransaction(
+          tx,
+          { shieldedSecretKeys, dustSecretKey },
+          { ttl: ttl ?? new Date(Date.now() + 30 * 60 * 1000) },
+        );
+        return wallet.finalizeRecipe(recipe);
+      },
+      submitTx: (tx: any) => wallet.submitTransaction(tx) as any,
+    };
+
+    const providers = {
+      publicDataProvider: indexerPublicDataProvider(NETWORK_CONFIG.indexer, NETWORK_CONFIG.indexerWS),
+      zkConfigProvider,
+      proofProvider: httpClientProofProvider(NETWORK_CONFIG.proofServer, zkConfigProvider),
+      walletProvider: walletAndMidnightProvider,
+      midnightProvider: walletAndMidnightProvider,
+    };
+
+    await submitTxAsync(providers as any, { unprovenTx: deployTxData.private.unprovenTx });
     console.log('6. Waiting for the contract to be indexed...');
     await waitForContractDeployment(contractAddress);
+    await wallet.stop();
   }
 
   // --- Persist address for the frontend -------------------------------------
@@ -307,12 +296,9 @@ async function main() {
     .join('\n') + '\n';
   fs.writeFileSync(envLocalPath, updated);
 
-  console.log('\n✅ ShadowDAO deployment complete!');
+  console.log('\n✅ ShadowDAO deployment script finished!');
   console.log(`   Contract Address: ${contractAddress}`);
   console.log(`   Written to .env.local (VITE_CONTRACT_ADDRESS)`);
-  console.log('   Next: paste this address into README.md, then `npm run dev`.\n');
-
-  await wallet.stop();
 }
 
 async function waitForContractDeployment(contractAddress: string, maxAttempts = 60) {
