@@ -1,5 +1,6 @@
 # ShadowDAO
 ![CI](https://github.com/pranavpatil0666-ai/SHADOWDAO/actions/workflows/ci.yml/badge.svg)
+![Smart Contract CI/CD](https://github.com/pranavpatil0666-ai/SHADOWDAO/actions/workflows/contract.yml/badge.svg)
 > Private governance on Midnight — vote with a Zero-Knowledge proof, never reveal your choice.
 
 ## Live Demo
@@ -66,6 +67,7 @@ npm test
 
 ## CI/CD
 - **Testing & Build Validation**: A GitHub Actions workflow automatically runs on every push and pull request to the `main` branch. It ensures that `npm test` and `npm run build` pass before any code is considered stable.
+- **Smart Contract Pipeline**: An idempotent GitHub Action verifies the deterministic deployment setup (`contract.yml`), ensuring the network address is strictly maintained.
 - **Deployment**: Vercel automatically deploys the frontend on every push to the `main` branch. The build pipeline securely bundles the Midnight Zero-Knowledge artifacts and contract addresses into the static application for production hosting.
 
 ## Product Proposal
